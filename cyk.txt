@@ -1,0 +1,112 @@
+from nltk.tree import Tree
+from collections import defaultdict
+from tabulate import tabulate
+
+def read_grammar(grammar_file):
+  grammar=defaultdict(list)
+  rhs_to_lhs=defaultdict(set)
+  with open(grammar_file) as f:
+    for line in f:
+      if "->" not in line:
+        continue
+      lhs,rhs=line.strip().split('->')
+      lhs=lhs.strip()
+      rhs_symbols=rhs.strip().split()
+      grammar[lhs].append(rhs_symbols)
+      rhs_to_lhs[tuple(rhs_symbols)].add(lhs)
+  return grammar,rhs_to_lhs
+
+def cyk_parser(rhs_to_lhs,tokens):
+  n=len(tokens)
+  table=[]
+  for i in range(n):
+    row=[]
+    for j in range(n):
+      row.append(set())
+    table.append(row)
+  back=[]
+  for i in range(n):
+    row=[]
+    for j in range(n):
+      row.append(defaultdict(list))
+    back.append(row)
+
+  #diagonal entries
+  for i in range(n):
+    token=tokens[i]
+    possible_lhs=rhs_to_lhs.get((token,),set())
+    for lhs in possible_lhs:
+      table[i][i].add(lhs)
+
+  for l in range(2,n+1):
+    for i in range(n-l+1):
+      j=i+l-1
+      for k in range(i,j):
+        for B in table[i][k]:
+          for C in table[k+1][j]:
+            rhs=(B,C)
+            for A in rhs_to_lhs.get(rhs,set()):
+              table[i][j].add(A)
+              back[i][j][A].append((k,B,C))
+  
+  def tree_builder(i,j,symbol):
+    if i==j:
+      return (tokens[i],symbol)
+    if symbol in back[i][j]:
+      for entry in back[i][j][symbol]:
+        k,B,C=entry
+        left=tree_builder(i,k,B)
+        right=tree_builder(k+1,j,C)
+        return (symbol,left,right)
+  if 'S' in back[0][n-1]:
+    return table,back,tree_builder
+  else:
+    return table,back,None
+
+def tuple_to_tree(tree_tuple):
+  if isinstance(tree_tuple,tuple):
+    label=tree_tuple[0]
+    children=[]
+    for child in tree_tuple[1:]:
+      children.append(tuple_to_tree(child))
+    return Tree(label,children)
+  return tree_tuple
+
+def display_table(tokens):
+  n=len(tokens)
+  disp_table=[]
+  for i in range(n):
+    row=[]
+    for j in range(n):
+      row.append("")
+    disp_table.append(row)
+
+  for i in range(n):
+    for j in range(i,n):
+      if table[i][j]:
+        symbols=sorted(list(table[i][j]))
+        cell_text=""
+        for sym in symbols:
+          if cell_text:
+            cell_text+=" , "
+          cell_text+=sym
+        disp_table[i][j]=cell_text
+  headers=[]
+  for i in range(len(tokens)):
+    headers.append(f'{i+1}:{tokens[i]}')
+  print(tabulate(disp_table,headers=headers))
+
+grammar_file="NLP/cyk_grammar.txt"
+sentence = "astronomers saw stars with ears"
+tokens=sentence.split()
+grammar,rhs_to_lhs=read_grammar(grammar_file)
+print(grammar)
+
+table,back,tree_builder=cyk_parser(rhs_to_lhs,tokens)
+n=len(tokens)
+if tree_builder:
+  tree_tuple=tree_builder(0,n-1,'S')
+  tree=tuple_to_tree(tree_tuple)
+  tree.pretty_print()
+
+display_table(tokens)

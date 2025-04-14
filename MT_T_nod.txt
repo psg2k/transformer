@@ -1,0 +1,96 @@
+!pip install datasets transformers
+
+import pandas as pd
+import torch
+from transformers import (
+    MarianTokenizer,
+    MarianMTModel,
+    Seq2SeqTrainer,
+    Seq2SeqTrainingArguments,
+    DataCollatorForSeq2Seq
+)
+from sklearn.model_selection import train_test_split
+
+# Config
+model_name = "Helsinki-NLP/opus-mt-en-fr"
+batch_size = 4
+epochs = 3
+
+# Load dataset
+df = pd.read_csv("/content/drive/MyDrive/sem8/NLP/eng_-french.csv", encoding='latin1')
+print(df.columns)
+df.rename(columns={
+    'English words/sentences': 'source',
+    'French words/sentences': 'target',
+}, inplace=True)
+
+# Load model and tokenizer
+tokenizer = MarianTokenizer.from_pretrained(model_name)
+model = MarianMTModel.from_pretrained(model_name)
+
+# Tokenization manually
+def preprocess_function(sources, targets):
+    inputs = tokenizer(sources.tolist(), max_length=128, truncation=True, padding="max_length", return_tensors="pt")
+    with tokenizer.as_target_tokenizer():
+        labels = tokenizer(targets.tolist(), max_length=128, truncation=True, padding="max_length", return_tensors="pt")
+    inputs["labels"] = labels["input_ids"]
+    return inputs
+
+# Train/validation split
+train_df, val_df = train_test_split(df, test_size=0.1)
+
+# Convert to dict for Dataset-like access
+train_data = preprocess_function(train_df["source"], train_df["target"])
+val_data = preprocess_function(val_df["source"], val_df["target"])
+
+# Custom Dataset class for PyTorch
+class TranslationDataset(torch.utils.data.Dataset):
+    def __init__(self, data):
+        self.data = data
+
+    def __len__(self):
+        return self.data["input_ids"].shape[0]
+
+    def __getitem__(self, idx):
+        return {
+            "input_ids": self.data["input_ids"][idx],
+            "attention_mask": self.data["attention_mask"][idx],
+            "labels": self.data["labels"][idx],
+        }
+
+train_dataset = TranslationDataset(train_data)
+val_dataset = TranslationDataset(val_data)
+
+# Training arguments
+training_args = Seq2SeqTrainingArguments(
+    output_dir="./tmp",
+    per_device_train_batch_size=batch_size,
+    num_train_epochs=epochs,
+    evaluation_strategy="no",
+    report_to="none"
+)
+
+# Data collator
+data_collator = DataCollatorForSeq2Seq(tokenizer, model=model)
+
+# Trainer
+trainer = Seq2SeqTrainer(
+    model=model,
+    args=training_args,
+    train_dataset=train_dataset,
+    eval_dataset=val_dataset,
+    tokenizer=tokenizer,
+    data_collator=data_collator,
+)
+
+# Train
+trainer.train()
+
+# Translation function
+def translate(text):
+    encoded = tokenizer(text, return_tensors="pt", padding=True, truncation=True)
+    generated = model.generate(**encoded)
+    return tokenizer.decode(generated[0], skip_special_tokens=True)
+
+# Test
+print(translate("How are you?"))

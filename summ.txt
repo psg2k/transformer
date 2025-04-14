@@ -1,0 +1,74 @@
+import pandas as pd
+from datasets import Dataset
+from transformers import BartForConditionalGeneration, BartTokenizer, TrainingArguments, Trainer
+
+data = pd.read_csv("/content/drive/MyDrive/sem8/NLP/news_summary.csv")
+print(data.columns)
+sample_size = min(100, len(data))
+data = data.sample(n=sample_size, random_state=42)
+dataset = Dataset.from_pandas(data)
+
+model_name = "sshleifer/distilbart-cnn-12-6"
+tokenizer = BartTokenizer.from_pretrained(model_name)
+model = BartForConditionalGeneration.from_pretrained(model_name)
+
+def preprocess_function(examples):
+    inputs = tokenizer(examples["text"], max_length=512, truncation=True, padding="max_length")
+    with tokenizer.as_target_tokenizer():
+        labels = tokenizer(examples["headlines"], max_length=128, truncation=True, padding="max_length")
+    inputs["labels"] = labels["input_ids"]
+    return inputs
+
+tokenized_dataset = dataset.map(preprocess_function, batched=True)
+
+training_args = TrainingArguments(
+    output_dir="./tmp",  # Required even if not saving
+    per_device_train_batch_size=2,
+    num_train_epochs=1,
+    report_to="none"
+)
+
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=tokenized_dataset,
+    tokenizer=tokenizer
+)
+
+trainer.train()
+def summarize(text):
+    inputs = tokenizer([text], return_tensors="pt", max_length=512, truncation=True)
+    summary_ids = model.generate(inputs["input_ids"], max_length=128, min_length=30, num_beams=4, early_stopping=True)
+    return tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+
+example = """Machine learning is a method of data analysis that automates analytical model building.
+It is a branch of artificial intelligence based on the idea that systems can learn from data, identify patterns and make decisions with minimal human intervention."""
+print(summarize(example))
+
+
+
+
+# Read multiple paragraphs from a .txt file
+with open("/content/your_file.txt", "r", encoding="utf-8") as file:
+    full_text = file.read()
+print(f"Total length of input: {len(tokenizer(full_text)['input_ids'])} tokens")
+
+# If the input is within BART's token limit (~1024 tokens for Bart-large, ~512 for distilBART), summarize directly
+if len(tokenizer(full_text)["input_ids"]) <= 512:
+    summary = summarize(full_text)
+    print("\nSummary:\n", summary)
+
+else:
+    from textwrap import wrap
+
+    chunks = wrap(full_text, 1024)  # you can change the character count to suit your tokenizer
+    summaries = []
+
+    for i, chunk in enumerate(chunks):
+        print(f"\n--- Chunk {i+1} ---")
+        chunk_summary = summarize(chunk)
+        print(chunk_summary)
+        summaries.append(chunk_summary)
+
+    final_summary = " ".join(summaries)
+    print("\n🔎 Final Combined Summary:\n", final_summary)
