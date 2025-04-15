@@ -9,25 +9,23 @@ from transformers import (
     DataCollatorForSeq2Seq
 )
 
-# Config
 model_name = "Helsinki-NLP/opus-mt-en-fr"
 batch_size = 4
 epochs = 3
 
 # Load dataset (CSV with 'source' and 'target' columns)
-df=pd.read_csv("NLP/eng_-french.csv",encoding='latin1')
+df=pd.read_csv("/content/drive/MyDrive/sem8/NLP/eng_-french.csv",encoding='latin1')
 print(df.columns)
 df.rename(columns={
     'English words/sentences': 'source',
     'French words/sentences': 'target',
 }, inplace=True)
+df = df.sample(n=100, random_state=42)  
 dataset = Dataset.from_pandas(df)
 
-# Load model and tokenizer
 tokenizer = MarianTokenizer.from_pretrained(model_name)
 model = MarianMTModel.from_pretrained(model_name)
 
-# Preprocessing
 def preprocess(example):
     model_inputs = tokenizer(example["source"], max_length=128, truncation=True, padding="max_length")
     with tokenizer.as_target_tokenizer():
@@ -37,7 +35,6 @@ def preprocess(example):
 
 tokenized_dataset = dataset.map(preprocess, batched=True)
 
-# Training arguments
 training_args = Seq2SeqTrainingArguments(
     output_dir="./tmp",
     per_device_train_batch_size=batch_size,
@@ -48,7 +45,6 @@ training_args = Seq2SeqTrainingArguments(
 # Data collator
 data_collator = DataCollatorForSeq2Seq(tokenizer, model=model)
 
-# Trainer
 trainer = Seq2SeqTrainer(
     model=model,
     args=training_args,
@@ -56,15 +52,11 @@ trainer = Seq2SeqTrainer(
     tokenizer=tokenizer,
     data_collator=data_collator,
 )
-
-# Fine-tune the model (in-memory)
 trainer.train()
 
-# Use directly without saving
 def translate(text):
     encoded = tokenizer(text, return_tensors="pt", padding=True, truncation=True)
     generated = model.generate(**encoded)
     return tokenizer.decode(generated[0], skip_special_tokens=True)
 
-# Example usage
 print(translate("How are you?"))
