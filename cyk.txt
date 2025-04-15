@@ -15,7 +15,36 @@ def read_grammar(grammar_file):
       grammar[lhs].append(rhs_symbols)
       rhs_to_lhs[tuple(rhs_symbols)].add(lhs)
   return grammar,rhs_to_lhs
+"""
+def get_grammar():
+    rules = [
+        ("S", ["NP", "VP"]),
+        ("NP", ["Det", "N"]),
+        ("NP", ["NP", "PP"]),
+        ("VP", ["V", "NP"]),
+        ("VP", ["VP", "PP"]),
+        ("PP", ["P", "NP"]),
+        ("Det", ["a"]),
+        ("Det", ["an"]),
+        ("Det", ["the"]),
+        ("N", ["astronomers"]),
+        ("N", ["ears"]),
+        ("N", ["stars"]),
+        ("V", ["saw"]),
+        ("P", ["with"]),
+    ]
 
+    from collections import defaultdict
+
+    grammar = defaultdict(list)
+    rhs_to_lhs = defaultdict(set)
+
+    for lhs, rhs in rules:
+        grammar[lhs].append(rhs)
+        rhs_to_lhs[tuple(rhs)].add(lhs)
+
+    return grammar, rhs_to_lhs
+"""
 def cyk_parser(rhs_to_lhs,tokens):
   n=len(tokens)
   table=[]
