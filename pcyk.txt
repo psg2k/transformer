@@ -120,3 +120,35 @@ tree1 = ['S', ['NP', 'John'], ['VP', ['VP', ['V', 'called'], ['NP', 'Mary']], ['
 tree2 = ['S', ['NP', 'John'], ['VP', ['V', 'called'], ['NP', ['NP', 'Mary'], ['PP', ['P', 'from'], ['NP', 'Denver']]]]]
 sentence = 'John called Mary from Denver'.split()
 parse_sentence(sentence, [tree1, tree2])
+
+
+
+
+"""
+sentence = 'John called Mary from Denver'.split()
+pcfg = {
+    'S': [(('NP', 'VP'), 1.0)],
+    'NP': [(('John',), 0.5), (('Mary',), 0.25), (('Denver',), 0.25)],
+    'VP': [(('V', 'NP'), 0.5), (('VP', 'PP'), 0.5)],
+    'V': [(('called',), 1.0)],
+    'PP': [(('P', 'NP'), 1.0)],
+    'P': [(('from',), 1.0)]
+}
+def parse_sentence_with_given_pcfg(sentence, pcfg):
+    print("PCFG (Given):")
+    for lhs, rules in pcfg.items():
+        for rhs, prob in rules:
+            print(f"{lhs} -> {' '.join(rhs)} [{prob:.2f}]")
+    
+    n = len(sentence)
+    table = pcyk_table(sentence, pcfg)
+
+    print("\nMost Probable Parse Tree")
+    if 'S' in table[0][n - 1]:
+        tree = build_tree(0, n - 1, 'S', table)
+        pprint.pprint(tree)
+        print(f"Probability of the parse tree: {math.exp(table[0][n - 1]['S'][0]):.8f}")
+        print("\nViterbi Parsing Table")
+        display_viterbi_table(sentence, table)
+    else:
+        print("No valid parse found.")"""
