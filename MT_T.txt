@@ -20,7 +20,8 @@ df.rename(columns={
     'English words/sentences': 'source',
     'French words/sentences': 'target',
 }, inplace=True)
-df = df.sample(n=100, random_state=42)  
+df = df.sample(n=100, random_state=42).reset_index(drop=True)
+
 dataset = Dataset.from_pandas(df)
 
 tokenizer = MarianTokenizer.from_pretrained(model_name)
